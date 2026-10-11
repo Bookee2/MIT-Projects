@@ -3,7 +3,7 @@
   const { fmt } = window.CRE;
   const esc = window.Assistant.esc;
   const $ = (id) => document.getElementById(id);
-  const state = { type: "Office", market: "ALL", range: 20 };
+  const state = { type: "Office", market: "ALL", range: 20, scenario: 0 };
   const sortState = { key: "vacancy", asc: true };
 
   // ------------------------------------------------------------------ gate
@@ -58,8 +58,9 @@
       storageSet("localStorage", "cre-pulse-theme", next);
       renderMarket();
       renderPortfolio();
+      Explorer.refresh();
     });
-    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderMarket(); renderPortfolio(); });
+    matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { renderMarket(); renderPortfolio(); Explorer.refresh(); });
   }
 
   // --------------------------------------------------------------- filters
@@ -171,7 +172,7 @@
   const where = () => (state.market === "ALL" ? `${state.type}, all 10 markets` : `${CRE.marketName(state.market)} ${state.type.toLowerCase()}`);
   const qLabel = (q) => q.replace("Q", " Q");
 
-  function renderCharts() {
+  function renderVacancy(animate) {
     const qs = CRE.quarters();
     const s = CRE.series(state.market, state.type);
     const R = state.range;
@@ -181,23 +182,53 @@
     const pad = (arr) => [...arr, ...fc.quarters.map(() => null)];
     const lastIdx = labels.length - 1;
     const actual = pad(s.vacancy_pct.slice(-R));
-    const fcLine = allLabels.map((_, i) => (i === lastIdx ? actual[lastIdx] : i > lastIdx ? fc.points[i - lastIdx - 1].value : null));
-    const lower = allLabels.map((_, i) => (i === lastIdx ? actual[lastIdx] : i > lastIdx ? fc.points[i - lastIdx - 1].lower : null));
-    const upper = allLabels.map((_, i) => (i === lastIdx ? actual[lastIdx] : i > lastIdx ? fc.points[i - lastIdx - 1].upper : null));
+    const ahead = (f) => allLabels.map((_, i) => (i === lastIdx ? actual[lastIdx] : i > lastIdx ? f(fc.points[i - lastIdx - 1], i - lastIdx) : null));
+    const fcLine = ahead((p) => p.value);
+    const lower = ahead((p) => p.lower);
+    const upper = ahead((p) => p.upper);
     const vSeries = [{ name: where(), values: actual, color: "--series-1", endLabel: false }];
     if (state.market !== "ALL") vSeries.push({ name: `${state.type}, all 10 markets`, values: pad(CRE.series("ALL", state.type).vacancy_pct.slice(-R)), color: "--benchmark", width: 1.5, endLabel: false });
-    vSeries.push({ name: "Forecast", values: fcLine, color: "--series-1", dashed: true, endLabel: true });
+    vSeries.push({ name: "Baseline forecast", values: fcLine, color: "--series-1", dashed: true, endLabel: true });
+
+    // What-if: extra (or lost) annual demand as a share of inventory lowers
+    // (or raises) vacancy by that share, spread evenly across the quarters.
+    const x = state.scenario;
+    const inv = s.inventory_sf[qs.length - 1];
+    let scenarioEnd = null;
+    if (x !== 0) {
+      const sc = ahead((p, h) => p.value - (x / 4) * h);
+      scenarioEnd = sc[sc.length - 1];
+      vSeries.push({ name: "What-if scenario", values: sc, color: "--series-2", dashed: true, endLabel: true });
+    }
+    $("scenario-out").textContent = x === 0 ? "Baseline (no change)"
+      : `${x > 0 ? "+" : "−"}${Math.abs(x).toFixed(2)}% of inventory (${fmt.signedSf(inv * x / 100)}/yr)`;
+
+    const annotations = state.market === "ALL" ? [] : CRE.anomalies({ types: [state.type] })
+      .filter((a) => a.market === state.market && labels.includes(a.quarter))
+      .map((a) => ({ index: labels.indexOf(a.quarter), text: `Unusual move ${fmt.pp(a.delta)}` }));
+
     Charts.line($("chart-vacancy"), {
       labels: allLabels, series: vSeries, band: { lower, upper, color: "--series-1", name: "80% range" },
       yFormat: (v, axis) => (axis ? `${+v.toFixed(1)}%` : fmt.pct(v)), shadeFrom: lastIdx, shadeLabel: "Forecast",
       tooltipTitle: qLabel, ariaLabel: `Vacancy rate for ${where()} with a four-quarter forecast`,
+      annotations, animate,
     });
     const legendItems = [{ name: where(), color: "--series-1" }];
     if (state.market !== "ALL") legendItems.push({ name: "All 10 markets", color: "--benchmark" });
-    legendItems.push({ name: "Forecast", color: "--series-1", dashed: true }, { name: "80% range", color: "--series-1", kind: "band" });
+    legendItems.push({ name: "Baseline forecast", color: "--series-1", dashed: true }, { name: "80% range", color: "--series-1", kind: "band" });
+    if (x !== 0) legendItems.push({ name: "What-if scenario", color: "--series-2", dashed: true });
     Charts.legend($("vac-legend"), legendItems);
     const end = fc.points[3];
-    $("vac-sub").textContent = `${where()}: ${fmt.pct(s.vacancy_pct[qs.length - 1])} now, with a baseline forecast of ${fmt.pct(end.value)} by ${qLabel(fc.quarters[3])}`;
+    $("vac-sub").textContent = `${where()}: ${fmt.pct(s.vacancy_pct[qs.length - 1])} now. Baseline ${fmt.pct(end.value)} by ${qLabel(fc.quarters[3])}`
+      + (scenarioEnd != null ? `; ${fmt.pct(scenarioEnd)} in the what-if scenario.` : ".");
+  }
+
+  function renderCharts(animate = true) {
+    const qs = CRE.quarters();
+    const s = CRE.series(state.market, state.type);
+    const R = state.range;
+    const labels = qs.slice(-R);
+    renderVacancy(animate);
 
     Charts.columns($("chart-supply"), {
       labels,
@@ -206,7 +237,7 @@
         { name: "Deliveries", values: s.deliveries_sf.slice(-R), color: "--series-2" },
       ],
       yFormat: (v, axis) => (axis ? fmt.axisCompact(v) : fmt.signedSf(v)), tooltipTitle: qLabel,
-      ariaLabel: `Net absorption and deliveries for ${where()}`,
+      ariaLabel: `Net absorption and deliveries for ${where()}`, animate,
     });
     Charts.legend($("sd-legend"), [{ name: "Net absorption", color: "--series-1", kind: "rect" }, { name: "Deliveries", color: "--series-2", kind: "rect" }]);
 
@@ -218,7 +249,7 @@
         { name: "10-year Treasury", values: CRE.data().treasury_10y_pct.slice(-R), color: "--series-2", endLabel: true },
       ],
       yFormat: (v, axis) => (axis ? `${+v.toFixed(1)}%` : fmt.pct(v, 2)), tooltipTitle: qLabel,
-      ariaLabel: `Cap rate and 10-year Treasury yield for ${where()}`,
+      ariaLabel: `Cap rate and 10-year Treasury yield for ${where()}`, animate,
     });
     Charts.legend($("cap-legend"), [{ name: "Cap rate", color: "--series-1" }, { name: "10-year Treasury", color: "--series-2" }]);
     $("cap-sub").textContent = `Spread is ${Math.round(k.spreadBps)} bps, ${k.spreadYoYbps >= 0 ? "wider" : "narrower"} by ${Math.abs(Math.round(k.spreadYoYbps))} bps YoY`;
@@ -289,22 +320,66 @@
     }));
 
     $("hs-caption").textContent = `Vacancy rate, all 10 markets, ${qLabel(D.quarters[D.quarters.length - 1])}`;
-    const items = [["Sample data", "Every figure here is synthetic. None of it is real market data."]];
-    const a = CRE.anomalies()[0];
-    if (a) items.push(["Anomaly", `${CRE.marketName(a.market)} ${a.type.toLowerCase()} vacancy ${fmt.pp(a.delta)} in ${qLabel(a.quarter)}`]);
-    const fc = CRE.vacancyForecast("ALL", "Office");
-    items.push(["Forecast", `Office vacancy ${fmt.pct(fc.points[3].value)} by ${qLabel(fc.quarters[3])}`]);
+    renderTicker();
+  }
+
+  // Scrolling highlights strip. Each item is computed from the data, and
+  // clicking one focuses the dashboard on it.
+  function tickerItems() {
+    const D = CRE.data();
+    const items = [{ label: "Sample data", text: "Every figure here is synthetic. None of it is real market data." }];
+    for (const a of CRE.anomalies()) {
+      items.push({ label: "Anomaly", text: `${CRE.marketName(a.market)} ${a.type.toLowerCase()} vacancy ${fmt.pp(a.delta)} in ${qLabel(a.quarter)}`, apply: { market: a.market, type: a.type } });
+    }
+    for (const t of D.property_types) {
+      const fc = CRE.vacancyForecast("ALL", t);
+      items.push({ label: "Forecast", text: `${t} vacancy ${fmt.pct(fc.points[3].value)} by ${qLabel(fc.quarters[3])}`, apply: { market: "ALL", type: t } });
+    }
+    for (const t of D.property_types) {
+      const best = CRE.scorecard(t).sort((a, b) => b.rentYoY - a.rentYoY)[0];
+      items.push({ label: "Rent growth", text: `${best.name} leads ${t.toLowerCase()} at ${fmt.signedPct(best.rentYoY)} YoY`, apply: { market: best.market, type: t } });
+    }
     const ind = CRE.kpis("ALL", "Industrial");
-    items.push(["Capital markets", `Industrial cap rates ${Math.round(ind.spreadBps)} bps over Treasuries`]);
+    items.push({ label: "Capital markets", text: `Industrial cap rates ${Math.round(ind.spreadBps)} bps over Treasuries`, apply: { market: "ALL", type: "Industrial" } });
+    const supply = CRE.scorecard("Industrial").sort((a, b) => b.ucPctInventory - a.ucPctInventory)[0];
+    items.push({ label: "Pipeline", text: `${supply.name} industrial: ${fmt.pct(supply.ucPctInventory)} of inventory under construction`, apply: { market: supply.market, type: "Industrial" } });
     const p = CRE.portfolio();
-    items.push(["Portfolio", `${fmt.pct(p.pctExpiring24, 0)} of sample leases expire within 24 months`]);
-    $("ticker").replaceChildren(...items.map(([label, text]) => {
-      const s = document.createElement("span");
-      s.className = "ticker-item";
-      const b = document.createElement("b"); b.textContent = label;
-      s.append(b, document.createTextNode(text));
-      return s;
-    }));
+    items.push({ label: "Portfolio", text: `${fmt.pct(p.pctExpiring24, 0)} of sample leases expire within 24 months`, jump: "portfolio" });
+    return items;
+  }
+
+  function renderTicker() {
+    const items = tickerItems();
+    const makeSet = (hidden) => {
+      const set = document.createElement("div");
+      set.className = "ticker-set";
+      if (hidden) set.setAttribute("aria-hidden", "true");
+      for (const it of items) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "ticker-item";
+        if (hidden) btn.tabIndex = -1;
+        const b = document.createElement("b"); b.textContent = it.label;
+        const t = document.createElement("span"); t.className = "t-text"; t.textContent = it.text;
+        btn.append(b, t);
+        btn.addEventListener("click", () => {
+          if (it.apply) { setState(it.apply); $("market").scrollIntoView({ behavior: "smooth" }); }
+          if (it.jump) $(it.jump).scrollIntoView({ behavior: "smooth" });
+        });
+        set.appendChild(btn);
+      }
+      return set;
+    };
+    const track = $("ticker");
+    track.replaceChildren(makeSet(false), makeSet(true));
+    // Constant reading speed (~55 px/s) whatever the content length.
+    requestAnimationFrame(() => track.style.setProperty("--ticker-dur", `${Math.round(track.scrollWidth / 2 / 55)}s`));
+    const band = $("ticker-band");
+    $("ticker-toggle").onclick = () => {
+      const paused = band.classList.toggle("paused");
+      $("ticker-toggle").setAttribute("aria-pressed", paused);
+      $("ticker-toggle").setAttribute("aria-label", paused ? "Play the highlights ticker" : "Pause the highlights ticker");
+    };
   }
 
   function renderMarket() {
@@ -314,6 +389,7 @@
     renderSummary();
     renderCharts();
     renderScorecard();
+    Explorer.render({ type: state.type, market: state.market });
   }
 
   // ------------------------------------------------------------- portfolio
@@ -464,6 +540,8 @@
     initFilters();
     renderDefs();
     initChat();
+    Explorer.init({ onSelect: (m) => setState({ market: m }) });
+    $("scenario").addEventListener("input", (e) => { state.scenario = +e.target.value; renderVacancy(false); });
     renderHero();
     renderMarket();
     renderPortfolio();

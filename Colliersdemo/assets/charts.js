@@ -100,7 +100,10 @@
   }
 
   // ---------------------------------------------------------------- line
+  const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+
   function line(container, opts) {
+    container.__animate = !!opts.animate && !reducedMotion();
     observe(container, () => renderLine(container, opts));
   }
 
@@ -150,7 +153,7 @@
       if (pts.length) {
         d = pts.map((i, k) => `${k ? "L" : "M"}${x(i)},${y(o.band.upper[i])}`).join("");
         d += pts.slice().reverse().map((i) => `L${x(i)},${y(o.band.lower[i])}`).join("") + "Z";
-        svg.appendChild(el("path", { d }, { fill: resolve(o.band.color), opacity: 0.14 }));
+        svg.appendChild(el("path", { d, class: "anim-fade" }, { fill: resolve(o.band.color), opacity: 0.14 }));
       }
     }
 
@@ -163,7 +166,26 @@
         d += `${pen ? "L" : "M"}${x(i)},${y(v)}`;
         pen = true;
       });
-      svg.appendChild(el("path", { d, fill: "none", "stroke-width": s.width || 2, "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": s.dashed ? "5 4" : "" }, { stroke: c }));
+      svg.appendChild(el("path", { d, fill: "none", "stroke-width": s.width || 2, "stroke-linejoin": "round", "stroke-linecap": "round", "stroke-dasharray": s.dashed ? "5 4" : "", class: s.dashed ? "anim-fade" : "anim-draw" }, { stroke: c }));
+    }
+
+    // Callouts: a ring on the point and a short label above it.
+    for (const a of o.annotations || []) {
+      const v = o.series[0].values[a.index];
+      if (v == null) continue;
+      const cx = x(a.index), cy = y(v);
+      const g = el("g", { class: "anim-fade annotation" });
+      g.appendChild(el("circle", { cx, cy, r: 7, fill: "none", "stroke-width": 1.5 }, { stroke: "var(--text-primary)" }));
+      const above = cy - 34 > m.t;
+      const ty = above ? cy - 22 : cy + 30;
+      g.appendChild(el("line", { x1: cx, x2: cx, y1: above ? cy - 8 : cy + 8, y2: above ? ty + 4 : ty - 12, "stroke-width": 1 }, { stroke: "var(--text-primary)" }));
+      const w = a.text.length * 6.4 + 14;
+      const lx = Math.max(m.l, Math.min(W - m.r - w, cx - w / 2));
+      g.appendChild(el("rect", { x: lx, y: ty - 13, width: w, height: 19, rx: 3 }, { fill: "var(--text-primary)" }));
+      const t = el("text", { x: lx + w / 2, y: ty + 1, "text-anchor": "middle", class: "annotation-text" });
+      t.textContent = a.text;
+      g.appendChild(t);
+      svg.appendChild(g);
     }
 
     // End markers and selective end labels.
@@ -234,10 +256,24 @@
     });
 
     container.replaceChildren(svg);
+    if (container.__animate) {
+      container.__animate = false;
+      svg.querySelectorAll(".anim-draw").forEach((p) => {
+        const len = p.getTotalLength();
+        p.style.strokeDasharray = `${len} ${len}`;
+        p.style.strokeDashoffset = len;
+        p.getBoundingClientRect();
+        p.style.transition = "stroke-dashoffset 900ms cubic-bezier(.3,.7,.2,1)";
+        p.style.strokeDashoffset = 0;
+        p.addEventListener("transitionend", () => { p.style.strokeDasharray = ""; }, { once: true });
+      });
+      svg.classList.add("fade-late");
+    }
   }
 
   // ------------------------------------------------------------- columns
   function columns(container, opts) {
+    container.__animate = !!opts.animate && !reducedMotion();
     observe(container, () => renderColumns(container, opts));
   }
 
@@ -315,13 +351,13 @@
           let y0 = y(base) - (v >= 0 ? gapTop : -gapTop);
           let y1 = y(end) + (v >= 0 && k !== lastPos ? 1 : 0);
           if (Math.abs(y1 - y0) < 0.5) y1 = y0 - 0.5;
-          g.appendChild(el("path", { d: roundedBar(bx(i), y0, y1, barW, 4, k === (v >= 0 ? lastPos : lastNeg)), class: "bar" }, { fill: resolve(s.color) }));
+          g.appendChild(el("path", { d: roundedBar(bx(i), y0, y1, barW, 4, k === (v >= 0 ? lastPos : lastNeg)), class: "bar" }, { fill: resolve(s.color), transformOrigin: v >= 0 ? "50% 100%" : "50% 0%", animationDelay: `${i * 18}ms` }));
         });
       } else {
         o.series.forEach((s, k) => {
           const v = s.values[i];
           if (v == null) return;
-          g.appendChild(el("path", { d: roundedBar(bx(i) + k * (barW + 2), y(0), y(v), barW, 4, true), class: "bar" }, { fill: resolve(s.color) }));
+          g.appendChild(el("path", { d: roundedBar(bx(i) + k * (barW + 2), y(0), y(v), barW, 4, true), class: "bar" }, { fill: resolve(s.color), transformOrigin: v >= 0 ? "50% 100%" : "50% 0%", animationDelay: `${i * 18}ms` }));
         });
       }
       svg.appendChild(g);
@@ -358,6 +394,11 @@
     });
 
     container.replaceChildren(svg);
+    if (container.__animate) {
+      container.__animate = false;
+      svg.classList.add("grow-bars");
+      setTimeout(() => svg.classList.remove("grow-bars"), 1400);
+    }
   }
 
   // ----------------------------------------------------------- sparkline
@@ -379,11 +420,17 @@
     container.replaceChildren();
     for (const it of items) {
       const s = document.createElement("span");
-      const k = document.createElement("i");
-      k.className = it.kind === "rect" ? "key-rect" : it.kind === "band" ? "key-band" : "key-line" + (it.dashed ? " dashed" : "");
-      if (it.kind === "rect") k.style.background = resolve(it.color);
-      else if (it.kind === "band") { k.style.background = resolve(it.color); k.style.opacity = 0.25; }
-      else { k.style.borderColor = resolve(it.color); k.style.setProperty("--dash", resolve(it.color)); }
+      let k;
+      if (it.kind === "rect" || it.kind === "band") {
+        k = document.createElement("i");
+        k.className = it.kind === "rect" ? "key-rect" : "key-band";
+        k.style.background = resolve(it.color);
+        if (it.kind === "band") k.style.opacity = 0.25;
+      } else {
+        // Line keys mirror the mark: a short stroke, dashed when the series is.
+        k = el("svg", { width: 18, height: 4, viewBox: "0 0 18 4", "aria-hidden": "true" });
+        k.appendChild(el("line", { x1: 1, x2: 17, y1: 2, y2: 2, "stroke-width": 2, "stroke-linecap": "round", "stroke-dasharray": it.dashed ? "4 3" : "" }, { stroke: resolve(it.color) }));
+      }
       s.append(k, document.createTextNode(it.name));
       container.appendChild(s);
     }
@@ -393,5 +440,5 @@
     document.querySelectorAll(".chart").forEach((c) => c.__render && c.__render());
   }
 
-  window.Charts = { line, columns, spark, legend, rerenderAll, hideTooltip };
+  window.Charts = { line, columns, spark, legend, rerenderAll, hideTooltip, showTooltip, el, niceScale, resolve, reducedMotion };
 })();
