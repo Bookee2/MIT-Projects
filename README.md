@@ -40,9 +40,15 @@ python3 -m http.server 8000 -d docs       # then open http://localhost:8000
 
 ## Publish with GitHub Pages
 
-1. Open the repo's **Settings → Pages**.
-2. Under **Build and deployment**, set **Source** to *Deploy from a branch*, choose `main` and the `/docs` folder, and save.
-3. After about a minute the site is live at `https://<username>.github.io/<repo>/`.
+The live site is served from the `gh-pages` branch at `https://bookee2.github.io/MIT-Projects/Colliersdemo/`. The site root redirects there.
+
+After changing anything in `docs/`, commit it, then run:
+
+```bash
+scripts/publish_pages.sh
+```
+
+The script copies `docs/` into `gh-pages` under `/Colliersdemo/` and pushes. GitHub redeploys within about a minute.
 
 ## Privacy
 
