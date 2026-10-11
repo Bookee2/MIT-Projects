@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow, noarchive">
+  <title>CRE Market Pulse · Project Demo for Colliers</title>
+  <meta name="description" content="AI-assisted commercial real estate market and portfolio analytics demo built on illustrative sample data.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M7 23V14M13 23V9M19 23V16M25 23V11' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="assets/styles.css">
+  <script src="assets/config.js"></script>
+</head>
+<body>
+  <!-- Passcode screen. Client-side only: it keeps casual visitors out, it is not security. -->
+  <div id="gate" class="gate" hidden>
+    <form id="gate-form" class="gate-card">
+      <div class="brand-mark" aria-hidden="true"></div>
+      <p class="eyebrow js-byline">Project Demo for Colliers</p>
+      <h1>CRE Market Pulse</h1>
+      <p class="muted">Private demo. Enter the passcode to continue.</p>
+      <label class="sr-only" for="gate-input">Passcode</label>
+      <input id="gate-input" type="password" autocomplete="current-password" placeholder="Passcode" required>
+      <button type="submit" class="btn btn-primary">Open dashboard</button>
+      <p id="gate-error" class="gate-error" role="alert" hidden>That passcode didn't match. Try again.</p>
+    </form>
+  </div>
+
+  <div id="app" hidden>
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="title-block">
+          <div class="brand-mark" aria-hidden="true"></div>
+          <div>
+            <p class="eyebrow js-byline">Project Demo for Colliers</p>
+            <h1>CRE Market Pulse</h1>
+            <p class="subtitle" id="subtitle">AI-assisted market and portfolio analytics</p>
+          </div>
+        </div>
+        <nav class="tabs" aria-label="Sections">
+          <a href="#market" class="tab">Market</a>
+          <a href="#portfolio" class="tab">Portfolio</a>
+          <a href="#methodology" class="tab">Methodology</a>
+        </nav>
+        <button id="theme-toggle" class="icon-btn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.39 5.39 0 0 1-4.4 2.26 5.4 5.4 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="notice" role="note">
+      <strong>Illustrative sample data.</strong> Every figure here is synthetic, generated to demonstrate the analytics. None of it is real market data.
+    </div>
+
+    <main>
+      <!-- ============ MARKET ============ -->
+      <section id="market" class="section">
+        <div class="filters" role="group" aria-label="Filters">
+          <div class="field">
+            <label for="f-range">Time range</label>
+            <select id="f-range">
+              <option value="12">Last 3 years</option>
+              <option value="20" selected>Last 5 years</option>
+              <option value="34">Since 2018</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-type">Property type</label>
+            <div class="segmented" id="f-type" role="radiogroup" aria-label="Property type"></div>
+          </div>
+          <div class="field">
+            <label for="f-market">Market</label>
+            <select id="f-market"></select>
+          </div>
+          <div class="asof" id="asof"></div>
+        </div>
+
+        <div class="kpi-grid" id="kpis"></div>
+
+        <div class="ai-grid">
+          <article class="card" id="summary-card">
+            <div class="card-head">
+              <div>
+                <h2>Executive summary</h2>
+                <p class="card-sub" id="summary-source">Insight engine (runs in the browser, computed from the data)</p>
+              </div>
+              <button id="summary-gemini" class="btn btn-ghost" type="button" hidden>Rewrite with Gemini</button>
+            </div>
+            <div id="summary-body" class="summary"></div>
+          </article>
+
+          <article class="card chat-card" aria-labelledby="chat-title">
+            <div class="card-head">
+              <div>
+                <h2 id="chat-title">Ask the data</h2>
+                <p class="card-sub" id="chat-mode">Grounded answers from the dashboard dataset</p>
+              </div>
+              <button id="ai-settings" class="btn btn-ghost" type="button">Connect Gemini</button>
+            </div>
+            <div id="chat-log" class="chat-log" aria-live="polite"></div>
+            <div class="chips" id="chips"></div>
+            <form id="chat-form" class="chat-form">
+              <label class="sr-only" for="chat-input">Ask a question</label>
+              <input id="chat-input" type="text" autocomplete="off" placeholder="e.g. Which market has the highest office vacancy?">
+              <button class="btn btn-primary" type="submit">Ask</button>
+            </form>
+          </article>
+        </div>
+
+        <div class="chart-grid">
+          <article class="card span-2">
+            <div class="card-head">
+              <div>
+                <h2>Vacancy rate and 4-quarter forecast</h2>
+                <p class="card-sub" id="vac-sub"></p>
+              </div>
+            </div>
+            <div class="legend" id="vac-legend"></div>
+            <div class="chart" id="chart-vacancy" style="height:300px"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Demand vs. new supply</h2>
+                <p class="card-sub">Net absorption and deliveries, sf per quarter</p>
+              </div>
+            </div>
+            <div class="legend" id="sd-legend"></div>
+            <div class="chart" id="chart-supply" style="height:260px"></div>
+          </article>
+
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Cap rate vs. 10-year Treasury</h2>
+                <p class="card-sub" id="cap-sub"></p>
+              </div>
+            </div>
+            <div class="legend" id="cap-legend"></div>
+            <div class="chart" id="chart-cap" style="height:260px"></div>
+          </article>
+
+          <article class="card span-2">
+            <div class="card-head">
+              <div>
+                <h2>Market scorecard</h2>
+                <p class="card-sub" id="score-sub">Latest quarter. Click a row to focus the dashboard on that market. Click a column header to sort.</p>
+              </div>
+              <button id="dl-market" class="btn btn-ghost" type="button">Download CSV</button>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table" id="scorecard"></table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ PORTFOLIO ============ -->
+      <section id="portfolio" class="section">
+        <div class="section-head">
+          <h2 class="section-title">Occupier portfolio: lease rollover risk</h2>
+          <p class="muted">A fictional client's 26 leases, scored against current market rents from the dataset above.</p>
+        </div>
+        <div class="kpi-grid kpi-grid-4" id="pf-kpis"></div>
+        <div class="chart-grid">
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Square feet expiring by year</h2>
+                <p class="card-sub">Stacked by property type</p>
+              </div>
+            </div>
+            <div class="legend" id="pf-legend"></div>
+            <div class="chart" id="chart-expiry" style="height:260px"></div>
+          </article>
+          <article class="card">
+            <div class="card-head">
+              <div>
+                <h2>Priority actions</h2>
+                <p class="card-sub">Leases ranked by an exposure score: size, time to expiry and market conditions</p>
+              </div>
+            </div>
+            <ol class="actions" id="pf-actions"></ol>
+          </article>
+          <article class="card span-2">
+            <div class="card-head">
+              <div>
+                <h2>Lease schedule</h2>
+                <p class="card-sub">Positive mark-to-market means renewal at today's asking rent costs more than the current rent</p>
+              </div>
+              <button id="dl-portfolio" class="btn btn-ghost" type="button">Download CSV</button>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table" id="leases"></table>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ============ METHODOLOGY ============ -->
+      <section id="methodology" class="section">
+        <div class="section-head">
+          <h2 class="section-title">Methodology and production architecture</h2>
+          <p class="muted">How every number is calculated, and how this prototype would run in production on Google Cloud.</p>
+        </div>
+
+        <article class="card">
+          <h2>Reference pipeline on Google Cloud</h2>
+          <p class="card-sub">The prototype reads a static JSON file. In production, each stage below maps to a managed service.</p>
+          <ol class="pipeline">
+            <li><span class="step-num">1</span><strong>Ingest</strong><span>Listings, leases, transactions, CoStar/broker feeds, public macro data (FRED, Census)</span><em>Cloud Storage, Dataflow</em></li>
+            <li><span class="step-num">2</span><strong>Model</strong><span>Staging, conformed market and property dimensions, quarterly KPI fact tables</span><em>BigQuery, Dataform/dbt</em></li>
+            <li><span class="step-num">3</span><strong>Validate</strong><span>Accounting identities (inventory, occupancy, absorption), freshness and anomaly tests</span><em>Dataplex data quality</em></li>
+            <li><span class="step-num">4</span><strong>Visualize</strong><span>Governed metric definitions in one semantic layer, embedded dashboards</span><em>Looker, Looker Studio</em></li>
+            <li><span class="step-num">5</span><strong>Explain</strong><span>Grounded summaries and Q&amp;A that cite the KPI tables; forecasts</span><em>Gemini on Vertex AI, BigQuery ML</em></li>
+          </ol>
+        </article>
+
+        <div class="chart-grid">
+          <article class="card">
+            <h2>KPI definitions</h2>
+            <dl class="defs" id="defs"></dl>
+          </article>
+          <article class="card">
+            <h2>Example KPI view in BigQuery SQL</h2>
+            <p class="card-sub">The same net absorption and vacancy logic the dashboard uses, written as a warehouse view</p>
+            <pre class="code"><code>CREATE OR REPLACE VIEW cre.market_kpis_quarterly AS
+SELECT
+  market_id,
+  property_type,
+  quarter,
+  inventory_sf,
+  vacant_sf / inventory_sf                         AS vacancy_rate,
+  occupied_sf - LAG(occupied_sf) OVER w            AS net_absorption_sf,
+  deliveries_sf,
+  SUM(deliveries_sf) OVER (w ROWS BETWEEN 3 PRECEDING
+                              AND CURRENT ROW)     AS deliveries_t4q_sf,
+  asking_rent_psf / LAG(asking_rent_psf, 4) OVER w
+    - 1                                            AS rent_growth_yoy,
+  cap_rate - t.yield_10y                           AS cap_spread
+FROM cre.market_quarter_facts
+JOIN macro.treasury_10y_quarterly AS t USING (quarter)
+WINDOW w AS (PARTITION BY market_id, property_type
+             ORDER BY quarter);</code></pre>
+            <h3>How the AI features stay trustworthy</h3>
+            <ul class="bullets">
+              <li>Every number in a summary is computed first, then put into words. The model never does the arithmetic.</li>
+              <li>The Gemini prompt contains only the current KPI table, and the model is told to say when an answer isn't in it.</li>
+              <li>The forecast is a damped Holt trend model with an error band. It is a transparent baseline, not a black box.</li>
+              <li>Anomalies are flagged when a quarter's vacancy change is more than 2.5 standard deviations from that market's own history.</li>
+            </ul>
+          </article>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <span id="footer-author">Independent project demo. Not affiliated with or endorsed by Colliers.</span>
+      <span>Sample data generated by <code>scripts/generate_sample_data.py</code>.</span>
+    </footer>
+  </div>
+
+  <dialog id="ai-dialog" class="dialog">
+    <form method="dialog" id="ai-dialog-form">
+      <h2>Connect Gemini (optional)</h2>
+      <p class="muted">Paste a Gemini API key from Google AI Studio to have Gemini answer questions and write summaries. The key is stored only in this browser and sent only to Google's API. Without a key, the built-in insight engine answers.</p>
+      <label for="ai-key">API key</label>
+      <input id="ai-key" type="password" autocomplete="off" placeholder="AIza…">
+      <label for="ai-model">Model</label>
+      <input id="ai-model" type="text" autocomplete="off">
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-ghost" id="ai-clear">Disconnect</button>
+        <button type="button" class="btn btn-ghost" id="ai-cancel">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="ai-save">Save</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div id="tooltip" class="tooltip" role="tooltip" hidden></div>
+
+  <noscript><p style="padding:24px">This dashboard needs JavaScript.</p></noscript>
+  <script src="assets/charts.js"></script>
+  <script src="assets/analytics.js"></script>
+  <script src="assets/assistant.js"></script>
+  <script src="assets/app.js"></script>
+</body>
+</html>

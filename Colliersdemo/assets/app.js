@@ -14,6 +14,16 @@
   function storageGet(store, k) { try { return window[store].getItem(k); } catch { return null; } }
   function storageSet(store, k, v) { try { window[store].setItem(k, v); } catch { /* private mode: fine */ } }
 
+  function byline() {
+    const c = window.CRE_CONFIG;
+    const parts = [c.preparedFor ? `Project Demo for ${c.preparedFor}` : "Project Demo", c.author].filter(Boolean);
+    document.querySelectorAll(".js-byline").forEach((el) => { el.textContent = parts.join(" · "); });
+    if (c.preparedFor) document.title = `CRE Market Pulse · Project Demo for ${c.preparedFor}`;
+    if (c.author) {
+      $("footer-author").textContent = `Built by ${c.author}.${c.preparedFor ? ` Independent project demo, not affiliated with or endorsed by ${c.preparedFor}.` : ""}`;
+    }
+  }
+
   function gate() {
     const want = (window.CRE_CONFIG.passcodeSha256 || "").toLowerCase();
     if (!want || storageGet("sessionStorage", "cre-pulse-unlocked") === want) return Promise.resolve();
@@ -404,6 +414,7 @@
 
   // ------------------------------------------------------------------ boot
   async function boot() {
+    byline();
     await gate();
     $("app").hidden = false;
     let json;
@@ -416,7 +427,6 @@
       return;
     }
     CRE.load(json);
-    if (window.CRE_CONFIG.author) $("footer-author").textContent = `Built by ${window.CRE_CONFIG.author}`;
     initTheme();
     initFilters();
     renderDefs();
