@@ -16,8 +16,10 @@
 
   function byline() {
     const c = window.CRE_CONFIG;
-    const parts = [c.preparedFor ? `Project Demo for ${c.preparedFor}` : "Project Demo", c.author].filter(Boolean);
-    document.querySelectorAll(".js-byline").forEach((el) => { el.textContent = parts.join(" · "); });
+    const demo = c.preparedFor ? `Project Demo for ${c.preparedFor}` : "Project Demo";
+    document.querySelectorAll(".js-demo-for").forEach((el) => { el.textContent = demo; });
+    document.querySelectorAll(".js-author").forEach((el) => { el.textContent = c.author ? `by ${c.author}` : ""; });
+    document.querySelectorAll(".js-byline").forEach((el) => { el.textContent = [demo, c.author && `by ${c.author}`].filter(Boolean).join(" · "); });
     if (c.preparedFor) document.title = `CRE Market Pulse · Project Demo for ${c.preparedFor}`;
     if (c.author) {
       $("footer-author").textContent = `Built by ${c.author}.${c.preparedFor ? ` Independent project demo, not affiliated with or endorsed by ${c.preparedFor}.` : ""}`;
@@ -211,7 +213,7 @@
       labels: allLabels, series: vSeries, band: { lower, upper, color: "--series-1", name: "80% range" },
       yFormat: (v, axis) => (axis ? `${+v.toFixed(1)}%` : fmt.pct(v)), shadeFrom: lastIdx, shadeLabel: "Forecast",
       tooltipTitle: qLabel, ariaLabel: `Vacancy rate for ${where()} with a four-quarter forecast`,
-      annotations, animate,
+      annotations, animate, link: "quarters",
     });
     const legendItems = [{ name: where(), color: "--series-1" }];
     if (state.market !== "ALL") legendItems.push({ name: "All 10 markets", color: "--benchmark" });
@@ -237,7 +239,7 @@
         { name: "Deliveries", values: s.deliveries_sf.slice(-R), color: "--series-2" },
       ],
       yFormat: (v, axis) => (axis ? fmt.axisCompact(v) : fmt.signedSf(v)), tooltipTitle: qLabel,
-      ariaLabel: `Net absorption and deliveries for ${where()}`, animate,
+      ariaLabel: `Net absorption and deliveries for ${where()}`, animate, link: "quarters",
     });
     Charts.legend($("sd-legend"), [{ name: "Net absorption", color: "--series-1", kind: "rect" }, { name: "Deliveries", color: "--series-2", kind: "rect" }]);
 
@@ -249,7 +251,7 @@
         { name: "10-year Treasury", values: CRE.data().treasury_10y_pct.slice(-R), color: "--series-2", endLabel: true },
       ],
       yFormat: (v, axis) => (axis ? `${+v.toFixed(1)}%` : fmt.pct(v, 2)), tooltipTitle: qLabel,
-      ariaLabel: `Cap rate and 10-year Treasury yield for ${where()}`, animate,
+      ariaLabel: `Cap rate and 10-year Treasury yield for ${where()}`, animate, link: "quarters",
     });
     Charts.legend($("cap-legend"), [{ name: "Cap rate", color: "--series-1" }, { name: "10-year Treasury", color: "--series-2" }]);
     $("cap-sub").textContent = `Spread is ${Math.round(k.spreadBps)} bps, ${k.spreadYoYbps >= 0 ? "wider" : "narrower"} by ${Math.abs(Math.round(k.spreadYoYbps))} bps YoY`;
@@ -312,14 +314,18 @@
       const k = CRE.kpis("ALL", t);
       const d = document.createElement("div");
       d.className = "hero-stat";
-      const l = document.createElement("div"); l.className = "hs-label"; l.textContent = t;
+      const l = document.createElement("div"); l.className = "hs-label"; l.textContent = `${t} vacancy`;
       const v = document.createElement("div"); v.className = "hs-value"; v.textContent = fmt.pct(k.vacancy);
-      const n = document.createElement("div"); n.className = "hs-note"; n.textContent = `${fmt.pp(k.vacancyYoY)} YoY`;
-      d.append(l, v, n);
+      const n = document.createElement("div");
+      const dir = Math.abs(k.vacancyYoY) < 0.05 ? "flat" : k.vacancyYoY < 0 ? "good" : "bad";
+      n.className = `hs-delta ${dir}`;
+      n.textContent = `${dir === "flat" ? "■" : k.vacancyYoY < 0 ? "▼" : "▲"} ${fmt.pp(k.vacancyYoY).replace(/^[+−±]/, "")} YoY`;
+      n.title = dir === "good" ? "Vacancy falling: market tightening" : dir === "bad" ? "Vacancy rising: market softening" : "Little change";
+      d.append(l, v, n, Charts.spark(CRE.series("ALL", t).vacancy_pct.slice(-12)));
       return d;
     }));
 
-    $("hs-caption").textContent = `Vacancy rate, all 10 markets, ${qLabel(D.quarters[D.quarters.length - 1])}`;
+    $("hs-caption").textContent = `Vacancy snapshot · all 10 markets · ${qLabel(D.quarters[D.quarters.length - 1])}`;
     renderTicker();
   }
 
@@ -384,7 +390,7 @@
 
   function renderMarket() {
     syncFilters();
-    $("subtitle").textContent = `Now viewing: ${where()}`;
+    $("subtitle").replaceChildren(document.createTextNode("Dashboard is showing: "), Object.assign(document.createElement("b"), { textContent: where() }));
     renderKpis();
     renderSummary();
     renderCharts();
@@ -548,6 +554,15 @@
     $("dl-market").addEventListener("click", () => download("cre_market_quarterly_sample.csv", CRE.marketCsv()));
     $("dl-portfolio").addEventListener("click", () => download("portfolio_sample_scored.csv", CRE.portfolioCsv()));
     window.addEventListener("scroll", Charts.hideTooltip, { passive: true });
+    document.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-export]");
+      if (!btn) return;
+      btn.disabled = true;
+      const c = window.CRE_CONFIG;
+      const footer = `CRE Market Pulse · ${c.preparedFor ? `Project Demo for ${c.preparedFor}` : "Project Demo"}${c.author ? ` · ${c.author}` : ""} · Illustrative sample data`;
+      try { await Charts.exportCard(btn.closest(".card"), `${btn.dataset.export}.png`, footer); }
+      finally { btn.disabled = false; }
+    });
   }
 
   boot();

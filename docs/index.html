@@ -29,15 +29,16 @@
   </div>
 
   <div id="app" hidden>
+    <span id="top"></span>
     <header class="topbar">
       <div class="topbar-inner">
-        <div class="title-block">
+        <a class="title-block" href="#top" aria-label="Back to top">
           <div class="brand-mark" aria-hidden="true"></div>
-          <div>
-            <p class="eyebrow js-byline">Project Demo for Colliers</p>
-            <h1>CRE Market Pulse</h1>
+          <div class="nav-text">
+            <p class="nav-kicker">CRE Market Pulse</p>
+            <h1 class="nav-title"><span class="js-demo-for">Project Demo for Colliers</span><span class="nav-by js-author"></span></h1>
           </div>
-        </div>
+        </a>
         <nav class="tabs" aria-label="Sections">
           <a href="#market" class="tab">Market</a>
           <a href="#portfolio" class="tab">Portfolio</a>
@@ -50,18 +51,31 @@
     </header>
 
     <section class="hero" aria-labelledby="hero-title">
+      <svg class="hero-art" viewBox="0 0 600 400" preserveAspectRatio="xMaxYMid slice" aria-hidden="true">
+        <path d="M600 40C430 60 360 180 250 260S60 380 0 400" />
+        <path d="M600 110C470 120 400 220 300 290S120 390 40 400" />
+        <path d="M600 180C500 190 450 260 360 320S200 400 120 400" />
+      </svg>
       <div class="hero-inner">
-        <div>
-          <p class="hero-eyebrow">AI-assisted analytics · Project demo</p>
-          <h2 class="hero-title" id="hero-title">Market and portfolio intelligence for commercial real estate</h2>
-          <p class="hero-lead">Ten US markets, three property types and a sample occupier portfolio, with forecasts, anomaly detection and an assistant that answers questions in plain English.</p>
-          <a class="hero-link" href="#market">Explore the market <span aria-hidden="true"></span></a>
-          <p id="subtitle"></p>
+        <div class="hero-copy">
+          <p class="hero-eyebrow"><span class="hero-pill">Interactive demo</span>AI-assisted CRE analytics</p>
+          <h2 class="hero-title" id="hero-title">Commercial real estate intelligence, <span>at a glance.</span></h2>
+          <ul class="hero-features">
+            <li><a href="#explorer-card"><span class="hf-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></span><span><b>10 markets, 3 property types</b><small>Office, industrial and retail, since 2018</small></span></a></li>
+            <li><a href="#chart-vacancy-card"><span class="hf-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M3 17l6-6 4 4 8-8M15 7h6v6"/></svg></span><span><b>Forecasts and what-ifs</b><small>4-quarter vacancy outlook</small></span></a></li>
+            <li><a href="#scorecard-card"><span class="hf-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3l9.5 17h-19L12 3zM12 10v4M12 17.5v.01"/></svg></span><span><b>Anomaly alerts</b><small>Unusual moves flagged automatically</small></span></a></li>
+            <li><a href="#chat-title"><span class="hf-icon"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M4 5h16v11H9l-5 4V5zM8 9.5h8M8 12.5h5"/></svg></span><span><b>Ask in plain English</b><small>Answers grounded in the data</small></span></a></li>
+          </ul>
+          <div class="hero-ctas">
+            <a class="hero-btn primary" href="#market">Explore the market <span aria-hidden="true">→</span></a>
+            <a class="hero-btn ghost" href="#portfolio">See the portfolio view</a>
+          </div>
         </div>
-        <div class="hero-stats-wrap">
-          <p class="hs-caption" id="hs-caption"></p>
+        <aside class="hero-panel" aria-label="Vacancy snapshot">
+          <p class="hp-title" id="hs-caption"></p>
           <div class="hero-stats" id="hero-stats"></div>
-        </div>
+          <p class="hp-viewing" id="subtitle"></p>
+        </aside>
       </div>
     </section>
 
@@ -137,16 +151,19 @@
         </div>
 
         <div class="chart-grid">
-          <article class="card span-2">
+          <article class="card span-2" id="chart-vacancy-card">
             <div class="card-head">
               <div>
                 <h2>Vacancy rate and 4-quarter forecast</h2>
                 <p class="card-sub" id="vac-sub"></p>
               </div>
-              <div class="scenario">
-                <label for="scenario">What-if: extra demand per year</label>
-                <input type="range" id="scenario" min="-2" max="2" step="0.25" value="0">
-                <output id="scenario-out" for="scenario">Baseline (no change)</output>
+              <div class="card-tools">
+                <div class="scenario">
+                  <label for="scenario">What-if: extra demand per year</label>
+                  <input type="range" id="scenario" min="-2" max="2" step="0.25" value="0">
+                  <output id="scenario-out" for="scenario">Baseline (no change)</output>
+                </div>
+                <button class="icon-btn export-btn" type="button" data-export="vacancy-forecast" aria-label="Download this chart as a PNG image" title="Download as PNG"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
               </div>
             </div>
             <div class="legend" id="vac-legend"></div>
@@ -159,6 +176,7 @@
                 <h2>Demand vs. new supply</h2>
                 <p class="card-sub">Net absorption and deliveries, sf per quarter</p>
               </div>
+              <button class="icon-btn export-btn" type="button" data-export="demand-vs-supply" aria-label="Download this chart as a PNG image" title="Download as PNG"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
             </div>
             <div class="legend" id="sd-legend"></div>
             <div class="chart" id="chart-supply" style="height:260px"></div>
@@ -170,6 +188,7 @@
                 <h2>Cap rate vs. 10-year Treasury</h2>
                 <p class="card-sub" id="cap-sub"></p>
               </div>
+              <button class="icon-btn export-btn" type="button" data-export="cap-rate-vs-treasury" aria-label="Download this chart as a PNG image" title="Download as PNG"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
             </div>
             <div class="legend" id="cap-legend"></div>
             <div class="chart" id="chart-cap" style="height:260px"></div>
@@ -189,6 +208,7 @@
                 <label class="sr-only" for="ex-slider">Quarter</label>
                 <input type="range" id="ex-slider" step="1">
                 <output id="ex-quarter" for="ex-slider"></output>
+                <button class="icon-btn export-btn" type="button" data-export="market-explorer" aria-label="Download this chart as a PNG image" title="Download as PNG"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
               </div>
             </div>
             <div class="explorer" id="explorer">
@@ -204,7 +224,7 @@
             </div>
           </article>
 
-          <article class="card span-2">
+          <article class="card span-2" id="scorecard-card">
             <div class="card-head">
               <div>
                 <h2>Market scorecard</h2>
@@ -234,6 +254,7 @@
                 <h2>Square feet expiring by year</h2>
                 <p class="card-sub">Stacked by property type</p>
               </div>
+              <button class="icon-btn export-btn" type="button" data-export="lease-expirations" aria-label="Download this chart as a PNG image" title="Download as PNG"><svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></button>
             </div>
             <div class="legend" id="pf-legend"></div>
             <div class="chart" id="chart-expiry" style="height:260px"></div>

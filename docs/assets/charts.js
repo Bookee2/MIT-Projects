@@ -102,7 +102,16 @@
   // ---------------------------------------------------------------- line
   const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // Linked hover: charts that share a link group mirror each other's hovered label.
+  function broadcast(src, label) {
+    if (!src.__link) return;
+    document.querySelectorAll(".chart").forEach((c) => {
+      if (c !== src && c.__link === src.__link && c.__highlight) c.__highlight(label);
+    });
+  }
+
   function line(container, opts) {
+    container.__link = opts.link || null;
     container.__animate = !!opts.animate && !reducedMotion();
     observe(container, () => renderLine(container, opts));
   }
@@ -215,9 +224,14 @@
     });
     const hit = el("rect", { x: m.l - 6, y: 0, width: W - m.l - m.r + 12, height: H, fill: "transparent", tabindex: 0, "aria-label": "Chart values. Use arrow keys to step through quarters." });
     svg.appendChild(hit);
+    // Value tag shown when another chart drives the hover (linked mode).
+    const tag = el("g", { visibility: "hidden", class: "link-tag" });
+    const tagBg = el("rect", { height: 18, rx: 3 }, { fill: "var(--text-primary)" });
+    const tagText = el("text", { class: "annotation-text", "text-anchor": "middle" });
+    tag.append(tagBg, tagText);
+    svg.appendChild(tag);
     let cur = n - 1;
-    const show = (i, evt) => {
-      cur = i;
+    const place = (i) => {
       cross.setAttribute("x1", x(i)); cross.setAttribute("x2", x(i));
       cross.setAttribute("visibility", "visible");
       const rows = [];
@@ -228,6 +242,32 @@
         dots[k].setAttribute("visibility", "visible");
         rows.push({ name: s.name, value: yFmt(v), color: resolve(s.color), dashed: s.dashed });
       });
+      return rows;
+    };
+    container.__highlight = (label) => {
+      const i = label == null ? -1 : labels.indexOf(label);
+      if (i < 0) { hideMarks(); return; }
+      place(i);
+      const v = o.series[0].values[i];
+      if (v == null) { tag.setAttribute("visibility", "hidden"); return; }
+      tagText.textContent = yFmt(v);
+      const w = tagText.textContent.length * 6.6 + 12;
+      const tx = Math.min(W - m.r - w / 2, Math.max(m.l + w / 2, x(i)));
+      const ty = Math.max(m.t + 14, y(v) - 16);
+      tagBg.setAttribute("x", tx - w / 2); tagBg.setAttribute("y", ty - 13); tagBg.setAttribute("width", w);
+      tagText.setAttribute("x", tx); tagText.setAttribute("y", ty);
+      tag.setAttribute("visibility", "visible");
+    };
+    const hideMarks = () => {
+      cross.setAttribute("visibility", "hidden");
+      dots.forEach((d) => d.setAttribute("visibility", "hidden"));
+      tag.setAttribute("visibility", "hidden");
+    };
+    const show = (i, evt) => {
+      cur = i;
+      tag.setAttribute("visibility", "hidden");
+      const rows = place(i);
+      broadcast(container, labels[i]);
       if (o.band && o.band.upper[i] != null) {
         rows.push({ name: o.band.name || "Range", value: `${yFmt(o.band.lower[i])} – ${yFmt(o.band.upper[i])}`, color: resolve(o.band.color) });
       }
@@ -236,9 +276,9 @@
       showTooltip(e, o.tooltipTitle ? o.tooltipTitle(labels[i]) : labels[i], rows);
     };
     const hide = () => {
-      cross.setAttribute("visibility", "hidden");
-      dots.forEach((d) => d.setAttribute("visibility", "hidden"));
+      hideMarks();
       hideTooltip();
+      broadcast(container, null);
     };
     hit.addEventListener("pointermove", (evt) => {
       const box = svg.getBoundingClientRect();
@@ -273,6 +313,7 @@
 
   // ------------------------------------------------------------- columns
   function columns(container, opts) {
+    container.__link = opts.link || null;
     container.__animate = !!opts.animate && !reducedMotion();
     observe(container, () => renderColumns(container, opts));
   }
@@ -333,6 +374,14 @@
       svg.appendChild(t);
     });
 
+    const hl = el("rect", { y: m.t, height: H - m.t - m.b, width: band, visibility: "hidden", rx: 3 }, { fill: "var(--surface-2)" });
+    svg.appendChild(hl);
+    const markBand = (i) => {
+      if (i < 0) { hl.setAttribute("visibility", "hidden"); return; }
+      hl.setAttribute("x", m.l + band * i);
+      hl.setAttribute("visibility", "visible");
+    };
+    container.__highlight = (label) => markBand(label == null ? -1 : labels.indexOf(label));
     const groups = [];
     for (let i = 0; i < n; i++) {
       const g = el("g");
@@ -380,8 +429,15 @@
         const box = svg.getBoundingClientRect();
         const e = evt && evt.clientX != null ? evt : { clientX: box.left + m.l + band * i + band / 2, clientY: box.top + m.t + 20 };
         showTooltip(e, o.tooltipTitle ? o.tooltipTitle(l) : l, rows());
+        markBand(i);
+        broadcast(container, l);
       };
-      const off = () => { groups[i].querySelectorAll(".bar").forEach((b) => b.classList.remove("hover")); hideTooltip(); };
+      const off = () => {
+        groups[i].querySelectorAll(".bar").forEach((b) => b.classList.remove("hover"));
+        hideTooltip();
+        markBand(-1);
+        broadcast(container, null);
+      };
       hit.addEventListener("pointermove", on);
       hit.addEventListener("pointerleave", off);
       hit.addEventListener("focus", () => on());
@@ -436,9 +492,106 @@
     }
   }
 
+  // ---------------------------------------------------------------- export
+  // Renders a card's chart(s) to a PNG with its title, subtitle, legend and
+  // a footer. Computed styles are inlined so the image matches the screen.
+  const STYLE_PROPS = ["fill", "stroke", "stroke-width", "stroke-dasharray", "stroke-linecap", "stroke-linejoin",
+    "opacity", "fill-opacity", "font-size", "font-weight", "font-style", "visibility"];
+
+  function inlineStyles(src, dst) {
+    const cs = getComputedStyle(src);
+    for (const p of STYLE_PROPS) dst.setAttribute(p, cs.getPropertyValue(p));
+    dst.setAttribute("font-family", "Helvetica, Arial, sans-serif");
+    if (cs.transform && cs.transform !== "none" && src.tagName !== "svg") dst.setAttribute("transform", cs.transform);
+    dst.removeAttribute("style");
+    dst.removeAttribute("class");
+    dst.removeAttribute("tabindex");
+    for (let i = 0; i < src.children.length; i++) inlineStyles(src.children[i], dst.children[i]);
+  }
+
+  function svgImage(svg) {
+    const clone = svg.cloneNode(true);
+    inlineStyles(svg, clone);
+    clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
+    const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(clone)], { type: "image/svg+xml" }));
+    return new Promise((ok, fail) => {
+      const img = new Image();
+      img.onload = () => { URL.revokeObjectURL(url); ok(img); };
+      img.onerror = fail;
+      img.src = url;
+    });
+  }
+
+  async function exportCard(card, filename, footer) {
+    const charts = [...card.querySelectorAll(".chart > svg")];
+    if (!charts.length) return;
+    const tok = (n) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+    const font = getComputedStyle(document.body).fontFamily;
+    const rects = charts.map((c) => c.getBoundingClientRect());
+    const left = Math.min(...rects.map((r) => r.left)), top = Math.min(...rects.map((r) => r.top));
+    const cw = Math.max(...rects.map((r) => r.right)) - left, ch = Math.max(...rects.map((r) => r.bottom)) - top;
+    const pad = 28, scale = 2;
+    const title = card.querySelector("h2")?.textContent.trim() || "Chart";
+    const sub = card.querySelector(".card-sub")?.textContent.trim() || "";
+    const legend = [...card.querySelectorAll(".legend > span")].map((sp) => {
+      const line = sp.querySelector("line");
+      const i = sp.querySelector("i");
+      return {
+        text: sp.textContent.trim(),
+        kind: line ? "line" : "rect",
+        color: line ? line.style.stroke : i ? getComputedStyle(i).backgroundColor : "#888",
+        dashed: line ? !!line.getAttribute("stroke-dasharray") : false,
+        alpha: i ? +getComputedStyle(i).opacity : 1,
+      };
+    });
+    const W = Math.max(cw, 640) + pad * 2;
+    const headH = 26 + (sub ? 22 : 0) + (legend.length ? 28 : 0) + 10;
+    const H = pad + headH + ch + 40 + pad / 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = W * scale; canvas.height = H * scale;
+    const g = canvas.getContext("2d");
+    g.scale(scale, scale);
+    g.fillStyle = tok("--surface-1"); g.fillRect(0, 0, W, H);
+    g.fillStyle = tok("--navy"); g.fillRect(0, 0, W, 5);
+    let yy = pad + 14;
+    g.fillStyle = tok("--text-primary"); g.font = `600 18px ${font}`; g.fillText(title, pad, yy);
+    if (sub) { yy += 22; g.fillStyle = tok("--text-secondary"); g.font = `13px ${font}`; g.fillText(sub, pad, yy); }
+    if (legend.length) {
+      yy += 26;
+      let lx = pad;
+      g.font = `12.5px ${font}`;
+      for (const it of legend) {
+        g.save();
+        g.globalAlpha = it.kind === "rect" ? it.alpha : 1;
+        g.fillStyle = g.strokeStyle = it.color;
+        if (it.kind === "line") {
+          g.lineWidth = 2; g.setLineDash(it.dashed ? [4, 3] : []);
+          g.beginPath(); g.moveTo(lx, yy - 4); g.lineTo(lx + 16, yy - 4); g.stroke();
+        } else {
+          g.fillRect(lx, yy - 9, 12, 10);
+        }
+        g.restore();
+        g.fillStyle = tok("--text-secondary");
+        g.fillText(it.text, lx + 22, yy);
+        lx += 22 + g.measureText(it.text).width + 18;
+      }
+    }
+    const chartTop = pad + headH;
+    const imgs = await Promise.all(charts.map(svgImage));
+    imgs.forEach((img, k) => g.drawImage(img, pad + rects[k].left - left, chartTop + rects[k].top - top, rects[k].width, rects[k].height));
+    g.fillStyle = tok("--text-muted"); g.font = `11px ${font}`;
+    g.fillText(footer || "Illustrative sample data", pad, H - pad / 2 - 4);
+    await new Promise((ok) => canvas.toBlob((blob) => {
+      const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: filename });
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      ok();
+    }, "image/png"));
+  }
+
   function rerenderAll() {
     document.querySelectorAll(".chart").forEach((c) => c.__render && c.__render());
   }
 
-  window.Charts = { line, columns, spark, legend, rerenderAll, hideTooltip, showTooltip, el, niceScale, resolve, reducedMotion };
+  window.Charts = { line, columns, spark, legend, rerenderAll, hideTooltip, showTooltip, el, niceScale, resolve, reducedMotion, exportCard };
 })();
