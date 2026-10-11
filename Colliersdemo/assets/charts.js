@@ -106,6 +106,7 @@
 
   function renderLine(container, o) {
     const W = container.clientWidth;
+    if (W < 120) return; // not laid out yet; the ResizeObserver renders once it has a width
     const H = container.clientHeight || 280;
     const labels = o.labels;
     const n = labels.length;
@@ -254,6 +255,7 @@
 
   function renderColumns(container, o) {
     const W = container.clientWidth;
+    if (W < 120) return; // not laid out yet; the ResizeObserver renders once it has a width
     const H = container.clientHeight || 260;
     const labels = o.labels;
     const n = labels.length;

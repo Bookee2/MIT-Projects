@@ -7,6 +7,9 @@
   <title>CRE Market Pulse · Project Demo for Colliers</title>
   <meta name="description" content="AI-assisted commercial real estate market and portfolio analytics demo built on illustrative sample data.">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%232a78d6'/%3E%3Cpath d='M7 23V14M13 23V9M19 23V16M25 23V11' stroke='white' stroke-width='3' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700&display=swap">
   <link rel="stylesheet" href="assets/styles.css">
   <script src="assets/config.js"></script>
 </head>
@@ -33,7 +36,6 @@
           <div>
             <p class="eyebrow js-byline">Project Demo for Colliers</p>
             <h1>CRE Market Pulse</h1>
-            <p class="subtitle" id="subtitle">AI-assisted market and portfolio analytics</p>
           </div>
         </div>
         <nav class="tabs" aria-label="Sections">
@@ -47,13 +49,35 @@
       </div>
     </header>
 
-    <div class="notice" role="note">
-      <strong>Illustrative sample data.</strong> Every figure here is synthetic, generated to demonstrate the analytics. None of it is real market data.
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-inner">
+        <div>
+          <p class="hero-eyebrow">AI-assisted analytics · Project demo</p>
+          <h2 class="hero-title" id="hero-title">Market and portfolio intelligence for commercial real estate</h2>
+          <p class="hero-lead">Ten US markets, three property types and a sample occupier portfolio, with forecasts, anomaly detection and an assistant that answers questions in plain English.</p>
+          <a class="hero-link" href="#market">Explore the market <span aria-hidden="true"></span></a>
+          <p id="subtitle"></p>
+        </div>
+        <div class="hero-stats-wrap">
+          <p class="hs-caption" id="hs-caption"></p>
+          <div class="hero-stats" id="hero-stats"></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="ticker" role="note" aria-label="Highlights">
+      <div class="ticker-inner" id="ticker">
+        <span class="ticker-item"><b>Sample data</b>Every figure here is synthetic, generated to demonstrate the analytics. None of it is real market data.</span>
+      </div>
     </div>
 
     <main>
       <!-- ============ MARKET ============ -->
       <section id="market" class="section">
+        <div class="section-head">
+          <p class="eyebrow section-eyebrow">Market</p>
+          <h2 class="section-title">Market dashboard</h2>
+        </div>
         <div class="filters" role="group" aria-label="Filters">
           <div class="field">
             <label for="f-range">Time range</label>
@@ -158,6 +182,7 @@
       <!-- ============ PORTFOLIO ============ -->
       <section id="portfolio" class="section">
         <div class="section-head">
+          <p class="eyebrow section-eyebrow">Portfolio</p>
           <h2 class="section-title">Occupier portfolio: lease rollover risk</h2>
           <p class="muted">A fictional client's 26 leases, scored against current market rents from the dataset above.</p>
         </div>
@@ -200,6 +225,7 @@
       <!-- ============ METHODOLOGY ============ -->
       <section id="methodology" class="section">
         <div class="section-head">
+          <p class="eyebrow section-eyebrow">Methodology</p>
           <h2 class="section-title">Methodology and production architecture</h2>
           <p class="muted">How every number is calculated, and how this prototype would run in production on Google Cloud.</p>
         </div>

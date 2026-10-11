@@ -111,7 +111,7 @@
   // ------------------------------------------------------------------ KPIs
   function tile({ label, value, delta, deltaClass, deltaNote, note, spark, hero }) {
     const card = document.createElement("article");
-    card.className = "card kpi" + (hero ? " hero" : "");
+    card.className = "card kpi" + (hero ? " kpi-hero" : "");
     const l = document.createElement("div"); l.className = "kpi-label"; l.textContent = label;
     const v = document.createElement("div"); v.className = "kpi-value"; v.textContent = value;
     card.append(l, v);
@@ -274,9 +274,42 @@
     $("score-sub").textContent = `${state.type}, ${qLabel(rows[0].quarter)}. Click a row to focus the dashboard on that market. Click a column header to sort.`;
   }
 
+  // Navy hero band: vacancy by property type, plus a highlights strip.
+  function renderHero() {
+    const D = CRE.data();
+    $("hero-stats").replaceChildren(...D.property_types.map((t) => {
+      const k = CRE.kpis("ALL", t);
+      const d = document.createElement("div");
+      d.className = "hero-stat";
+      const l = document.createElement("div"); l.className = "hs-label"; l.textContent = t;
+      const v = document.createElement("div"); v.className = "hs-value"; v.textContent = fmt.pct(k.vacancy);
+      const n = document.createElement("div"); n.className = "hs-note"; n.textContent = `${fmt.pp(k.vacancyYoY)} YoY`;
+      d.append(l, v, n);
+      return d;
+    }));
+
+    $("hs-caption").textContent = `Vacancy rate, all 10 markets, ${qLabel(D.quarters[D.quarters.length - 1])}`;
+    const items = [["Sample data", "Every figure here is synthetic. None of it is real market data."]];
+    const a = CRE.anomalies()[0];
+    if (a) items.push(["Anomaly", `${CRE.marketName(a.market)} ${a.type.toLowerCase()} vacancy ${fmt.pp(a.delta)} in ${qLabel(a.quarter)}`]);
+    const fc = CRE.vacancyForecast("ALL", "Office");
+    items.push(["Forecast", `Office vacancy ${fmt.pct(fc.points[3].value)} by ${qLabel(fc.quarters[3])}`]);
+    const ind = CRE.kpis("ALL", "Industrial");
+    items.push(["Capital markets", `Industrial cap rates ${Math.round(ind.spreadBps)} bps over Treasuries`]);
+    const p = CRE.portfolio();
+    items.push(["Portfolio", `${fmt.pct(p.pctExpiring24, 0)} of sample leases expire within 24 months`]);
+    $("ticker").replaceChildren(...items.map(([label, text]) => {
+      const s = document.createElement("span");
+      s.className = "ticker-item";
+      const b = document.createElement("b"); b.textContent = label;
+      s.append(b, document.createTextNode(text));
+      return s;
+    }));
+  }
+
   function renderMarket() {
     syncFilters();
-    $("subtitle").textContent = `${where()} · AI-assisted market and portfolio analytics`;
+    $("subtitle").textContent = `Now viewing: ${where()}`;
     renderKpis();
     renderSummary();
     renderCharts();
@@ -431,6 +464,7 @@
     initFilters();
     renderDefs();
     initChat();
+    renderHero();
     renderMarket();
     renderPortfolio();
     $("dl-market").addEventListener("click", () => download("cre_market_quarterly_sample.csv", CRE.marketCsv()));
