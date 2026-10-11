@@ -65,9 +65,15 @@
       </div>
     </section>
 
-    <div class="ticker" role="note" aria-label="Highlights">
-      <div class="ticker-inner" id="ticker">
-        <span class="ticker-item"><b>Sample data</b>Every figure here is synthetic, generated to demonstrate the analytics. None of it is real market data.</span>
+    <div class="ticker" id="ticker-band" role="region" aria-label="Market highlights">
+      <div class="ticker-inner">
+        <div class="ticker-viewport">
+          <div class="ticker-track" id="ticker"></div>
+        </div>
+        <button class="ticker-toggle" id="ticker-toggle" type="button" aria-label="Pause the highlights ticker" aria-pressed="false">
+          <svg class="i-pause" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+          <svg class="i-play" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+        </button>
       </div>
     </div>
 
@@ -137,6 +143,11 @@
                 <h2>Vacancy rate and 4-quarter forecast</h2>
                 <p class="card-sub" id="vac-sub"></p>
               </div>
+              <div class="scenario">
+                <label for="scenario">What-if: extra demand per year</label>
+                <input type="range" id="scenario" min="-2" max="2" step="0.25" value="0">
+                <output id="scenario-out" for="scenario">Baseline (no change)</output>
+              </div>
             </div>
             <div class="legend" id="vac-legend"></div>
             <div class="chart" id="chart-vacancy" style="height:300px"></div>
@@ -162,6 +173,35 @@
             </div>
             <div class="legend" id="cap-legend"></div>
             <div class="chart" id="chart-cap" style="height:260px"></div>
+          </article>
+
+          <article class="card span-2" id="explorer-card">
+            <div class="card-head">
+              <div>
+                <h2>Market explorer: 2018 to today</h2>
+                <p class="card-sub" id="ex-sub"></p>
+              </div>
+              <div class="ex-controls">
+                <button class="play-btn" id="ex-play" type="button" aria-label="Play the time-lapse">
+                  <svg class="i-play" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+                  <svg class="i-pause" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+                </button>
+                <label class="sr-only" for="ex-slider">Quarter</label>
+                <input type="range" id="ex-slider" step="1">
+                <output id="ex-quarter" for="ex-slider"></output>
+              </div>
+            </div>
+            <div class="explorer" id="explorer">
+              <div>
+                <div class="ex-title">Vacancy by market</div>
+                <div class="chart" id="ex-map"></div>
+                <div class="ramp" id="ex-ramp" aria-hidden="true"></div>
+              </div>
+              <div>
+                <div class="ex-title">Vacancy vs. rent growth <span class="muted">(bubble size = inventory; lines = all-market average)</span></div>
+                <div class="chart" id="ex-bubble" style="height:320px"></div>
+              </div>
+            </div>
           </article>
 
           <article class="card span-2">
@@ -308,6 +348,7 @@ WINDOW w AS (PARTITION BY market_id, property_type
   <script src="assets/charts.js"></script>
   <script src="assets/analytics.js"></script>
   <script src="assets/assistant.js"></script>
+  <script src="assets/explorer.js"></script>
   <script src="assets/app.js"></script>
 </body>
 </html>
