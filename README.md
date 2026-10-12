@@ -59,3 +59,30 @@ The script copies `docs/` into `gh-pages` under `/Colliersdemo/` and pushes. Git
 ## Gemini (optional)
 
 Click **Connect Gemini** and paste an API key from Google AI Studio. The key is stored only in that browser's localStorage and sent only to `generativelanguage.googleapis.com`. Gemini receives a compact JSON copy of the current KPIs and is told to answer only from it. Without a key, or if a call fails, the built-in insight engine answers instead.
+
+## Google Cloud deployment
+
+The hosted version runs on Google Cloud project `colliers-demo-kb`:
+https://colliers-demo-165316578606.us-central1.run.app (same passcode).
+
+| Piece | Service | What it does |
+| --- | --- | --- |
+| `cre` dataset | BigQuery | Tables `markets`, `market_quarterly`, `portfolio`, `refresh_log`; views `v_market_kpis` and `v_lease_risk` |
+| `colliers-demo` | Cloud Run service | `server/main.py`: serves `docs/`, builds `data/cre_sample.json` from BigQuery (falls back to the static file), and answers `/api/gemini` with Gemini on Vertex AI |
+| `cre-refresh` | Cloud Run job | `scripts/load_bigquery.py`: reloads the tables and recreates the views |
+| `cre-quarterly-refresh` | Cloud Scheduler | Runs the job at 6am ET on Jan 2, Apr 2, Jul 2 and Oct 2 |
+| `cre-app` | Service account | BigQuery data editor and job user, Vertex AI user, Cloud Run invoker |
+
+On the hosted site, "Ask the data" and "Rewrite with Gemini" use the server, so viewers need no API key. The server checks the passcode before calling Gemini and limits calls to 20 a minute and 500 a day. On GitHub Pages the browser-key option still works.
+
+Redeploy after changes:
+
+```bash
+gcloud run deploy colliers-demo --source . --region us-central1 --project colliers-demo-kb
+```
+
+Take everything down (stops all charges):
+
+```bash
+gcloud projects delete colliers-demo-kb
+```

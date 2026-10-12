@@ -185,7 +185,18 @@
     memory = s && s.key ? s : null;
   }
   let memory = null;
-  const active = () => memory || (settings().key ? settings() : null);
+  // When the page is served by the Cloud Run server, Gemini runs there on Vertex AI
+  // and no browser key is needed. A key the viewer saved still takes priority.
+  let server = null;
+  async function detectServer() {
+    try {
+      const res = await fetch("api/status", { cache: "no-store" });
+      const s = res.ok ? await res.json() : null;
+      server = s && s.gemini ? s : null;
+    } catch { server = null; }
+    return server;
+  }
+  const active = () => memory || (settings().key ? settings() : null) || (server ? { server: true, model: server.model } : null);
 
   function context(state) {
     const k = CRE.kpis(state.market, state.type);
@@ -232,8 +243,22 @@
     "Define CRE terms briefly when helpful (absorption, cap rate, WALT).",
   ].join(" ");
 
+  async function callServer(prompt, state) {
+    let pass = "";
+    try { pass = sessionStorage.getItem("cre-pulse-passcode") || ""; } catch { /* storage blocked */ }
+    const res = await fetch("api/gemini", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Passcode": pass },
+      body: JSON.stringify({ prompt, context: context(state) }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+    return { html: mdLite(body.text), model: `${body.model} on Vertex AI` };
+  }
+
   async function callGemini(prompt, state) {
     const cfg = active();
+    if (cfg.server) return callServer(prompt, state);
     const model = (cfg.model || window.CRE_CONFIG.geminiModel || "").trim();
     const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     const res = await fetch(url, {
@@ -283,5 +308,5 @@
     return callGemini("Write an executive summary of the current selection for a client meeting: one bold headline sentence, 3-4 bullets (demand, rents, capital markets, outlook) and one recommendation line for occupiers and one for investors.", state);
   }
 
-  window.Assistant = { ask, geminiSummary, settings: () => active() || {}, saveSettings, isGemini: () => !!active(), esc };
+  window.Assistant = { ask, geminiSummary, settings: () => active() || {}, saveSettings, isGemini: () => !!active(), isServer: () => !!(active() || {}).server, detectServer, esc };
 })();

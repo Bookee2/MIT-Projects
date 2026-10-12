@@ -38,6 +38,8 @@
         try { ok = (await sha256($("gate-input").value.trim())) === want; } catch { ok = false; }
         if (ok) {
           storageSet("sessionStorage", "cre-pulse-unlocked", want);
+          // The hosted server checks the passcode itself before calling Gemini.
+          storageSet("sessionStorage", "cre-pulse-passcode", $("gate-input").value.trim());
           $("gate").hidden = true;
           resolve();
         } else {
@@ -516,6 +518,8 @@
     const on = Assistant.isGemini();
     $("chat-mode").textContent = on ? `Gemini (${Assistant.settings().model}), grounded in the dashboard's KPIs` : "Insight engine: grounded answers computed from the dataset";
     $("ai-settings").textContent = on ? "Gemini settings" : "Connect Gemini";
+    // Hosted on Cloud Run: Gemini runs server-side, so there's no key to manage.
+    $("ai-settings").hidden = Assistant.isServer();
     $("summary-gemini").hidden = !on;
   }
 
@@ -542,6 +546,7 @@
       return;
     }
     CRE.load(json);
+    await Assistant.detectServer();
     initTheme();
     initFilters();
     renderDefs();
