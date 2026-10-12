@@ -9,7 +9,7 @@ window.CRE_CONFIG = {
   // Default passcode: pulse2026
   // New hash: printf 'your-passcode' | sha256sum
   // The check runs in the browser, so this keeps casual visitors out. It is not real security.
-  passcodeSha256: "2945ba80c868c7479df0a71fc738758d05cf1dfc25a58f086f7ddc2f69b39f81",
+  passcodeSha256: "",
 
   // Default Gemini model name for the optional "Connect Gemini" feature.
   // Viewers can change it in the dialog if this name has been retired.
