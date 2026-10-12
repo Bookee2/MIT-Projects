@@ -63,7 +63,7 @@ Click **Connect Gemini** and paste an API key from Google AI Studio. The key is 
 ## Google Cloud deployment
 
 The hosted version runs on Google Cloud project `colliers-demo-kb`:
-https://colliers-demo-165316578606.us-central1.run.app (same passcode).
+https://colliers-demo-165316578606.us-central1.run.app (no passcode).
 
 | Piece | Service | What it does |
 | --- | --- | --- |
