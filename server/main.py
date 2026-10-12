@@ -5,8 +5,9 @@ Serves the static dashboard from docs/, plus:
     GET  /api/status             which data source and AI mode are live
     POST /api/gemini             Gemini on Vertex AI, grounded in the KPI context the page sends
 
-/api/gemini needs the demo passcode in the X-Passcode header and is rate limited,
-so the public URL can't be used to run up a Vertex bill.
+/api/gemini is rate limited so the public URL can't run up a Vertex bill, and by
+default also needs the demo passcode in the X-Passcode header
+(GEMINI_REQUIRE_PASSCODE=false turns that off).
 """
 
 import hashlib
@@ -39,6 +40,8 @@ def config_passcode_hash():
 
 
 PASSCODE_SHA256 = os.environ.get("PASSCODE_SHA256", "").lower() or config_passcode_hash()
+# Set GEMINI_REQUIRE_PASSCODE=false to skip the check; the rate limits still apply.
+REQUIRE_PASSCODE = os.environ.get("GEMINI_REQUIRE_PASSCODE", "true").lower() != "false"
 
 app = Flask(__name__, static_folder=None)
 app.config["MAX_CONTENT_LENGTH"] = MAX_BODY
@@ -145,7 +148,7 @@ def genai_client():
 
 
 def passcode_ok(value):
-    if not PASSCODE_SHA256:
+    if not REQUIRE_PASSCODE or not PASSCODE_SHA256:
         return True
     got = hashlib.sha256((value or "").strip().encode()).hexdigest()
     return hmac.compare_digest(got, PASSCODE_SHA256)

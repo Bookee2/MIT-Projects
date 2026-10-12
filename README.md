@@ -73,7 +73,7 @@ https://colliers-demo-165316578606.us-central1.run.app (same passcode).
 | `cre-quarterly-refresh` | Cloud Scheduler | Runs the job at 6am ET on Jan 2, Apr 2, Jul 2 and Oct 2 |
 | `cre-app` | Service account | BigQuery data editor and job user, Vertex AI user, Cloud Run invoker |
 
-On the hosted site, "Ask the data" and "Rewrite with Gemini" use the server, so viewers need no API key. The server checks the passcode before calling Gemini and limits calls to 20 a minute and 500 a day. On GitHub Pages the browser-key option still works.
+On the hosted site, "Ask the data" and "Rewrite with Gemini" use the server, so viewers need no API key. The Gemini endpoint does not require the passcode (`GEMINI_REQUIRE_PASSCODE=false`); it is limited to 20 calls a minute and 300 a day. On GitHub Pages the browser-key option still works.
 
 Redeploy after changes:
 
