@@ -288,19 +288,27 @@
         <div class="section-head">
           <p class="eyebrow section-eyebrow">Methodology</p>
           <h2 class="section-title">Methodology and production architecture</h2>
-          <p class="muted">How every number is calculated, and how this prototype would run in production on Google Cloud.</p>
+          <p class="muted">How every number is calculated, how the demo runs on Google Cloud today, and what would change for production.</p>
         </div>
 
         <article class="card">
-          <h2>Reference pipeline on Google Cloud</h2>
-          <p class="card-sub">The prototype reads a static JSON file. In production, each stage below maps to a managed service.</p>
+          <h2>How this demo runs on Google Cloud</h2>
+          <p class="card-sub" id="arch-status">The hosted demo runs on Cloud Run with data in BigQuery and Gemini on Vertex AI. This copy is static: it reads a bundled JSON file, and Gemini needs your own key.</p>
           <ol class="pipeline">
-            <li><span class="step-num">1</span><strong>Ingest</strong><span>Listings, leases, transactions, CoStar/broker feeds, public macro data (FRED, Census)</span><em>Cloud Storage, Dataflow</em></li>
-            <li><span class="step-num">2</span><strong>Model</strong><span>Staging, conformed market and property dimensions, quarterly KPI fact tables</span><em>BigQuery, Dataform/dbt</em></li>
-            <li><span class="step-num">3</span><strong>Validate</strong><span>Accounting identities (inventory, occupancy, absorption), freshness and anomaly tests</span><em>Dataplex data quality</em></li>
-            <li><span class="step-num">4</span><strong>Visualize</strong><span>Governed metric definitions in one semantic layer, embedded dashboards</span><em>Looker, Looker Studio</em></li>
-            <li><span class="step-num">5</span><strong>Explain</strong><span>Grounded summaries and Q&amp;A that cite the KPI tables; forecasts</span><em>Gemini on Vertex AI, BigQuery ML</em></li>
+            <li><span class="step-num">1</span><strong>Refresh</strong><span>A loader job reloads the market, lease and market-name tables, then rebuilds the KPI views, at 6am ET on the 2nd of each quarter. Each run is logged.</span><em>Cloud Scheduler, Cloud Run job</em></li>
+            <li><span class="step-num">2</span><strong>Model</strong><span>Dataset <code>cre</code>: quarterly market facts, the lease portfolio and markets. KPI definitions live once, as SQL views.</span><em>BigQuery</em></li>
+            <li><span class="step-num">3</span><strong>Serve</strong><span>One container serves this page and builds its dataset from BigQuery, cached for 5 minutes. If BigQuery is unreachable, it falls back to the bundled file.</span><em>Cloud Run service</em></li>
+            <li><span class="step-num">4</span><strong>Analyze</strong><span>KPIs, the vacancy forecast, anomaly flags and lease scoring are computed in the browser from that dataset.</span><em>JavaScript, no dependencies</em></li>
+            <li><span class="step-num">5</span><strong>Explain</strong><span>Questions and summaries go to the server, which sends Gemini only the on-screen KPIs. It runs as a service account, so no key is in the browser, and it is rate limited.</span><em>Gemini 2.5 Flash on Vertex AI</em></li>
           </ol>
+          <h3>From demo to production</h3>
+          <ul class="bullets">
+            <li><strong>Real feeds:</strong> point the loader at research extracts, lease administration exports and macro data landed in Cloud Storage. Nothing downstream changes.</li>
+            <li><strong>Quality gates:</strong> check accounting identities (inventory, occupancy, absorption), freshness and outliers before a load is published, with Dataplex data quality or tests in the loader.</li>
+            <li><strong>Access:</strong> put the service behind company sign-in with Identity-Aware Proxy instead of a public link.</li>
+            <li><strong>Delivery:</strong> deploy from the repository with a Cloud Build trigger, and alert on errors and spend with Cloud Monitoring and budgets.</li>
+            <li><strong>Scale:</strong> add a semantic layer (Looker) if many teams need the same governed metrics, and BigQuery ML for forecasts at portfolio scale.</li>
+          </ul>
         </article>
 
         <div class="chart-grid">
@@ -309,30 +317,42 @@
             <dl class="defs" id="defs"></dl>
           </article>
           <article class="card">
-            <h2>Example KPI view in BigQuery SQL</h2>
-            <p class="card-sub">The same net absorption and vacancy logic the dashboard uses, written as a warehouse view</p>
-            <pre class="code"><code>CREATE OR REPLACE VIEW cre.market_kpis_quarterly AS
-SELECT
-  market_id,
-  property_type,
-  quarter,
-  inventory_sf,
-  vacant_sf / inventory_sf                         AS vacancy_rate,
-  occupied_sf - LAG(occupied_sf) OVER w            AS net_absorption_sf,
-  deliveries_sf,
-  SUM(deliveries_sf) OVER (w ROWS BETWEEN 3 PRECEDING
-                              AND CURRENT ROW)     AS deliveries_t4q_sf,
-  asking_rent_psf / LAG(asking_rent_psf, 4) OVER w
-    - 1                                            AS rent_growth_yoy,
-  cap_rate - t.yield_10y                           AS cap_spread
-FROM cre.market_quarter_facts
-JOIN macro.treasury_10y_quarterly AS t USING (quarter)
-WINDOW w AS (PARTITION BY market_id, property_type
-             ORDER BY quarter);</code></pre>
+            <h2>The KPI view in BigQuery</h2>
+            <p class="card-sub">The live view behind the scorecard: latest quarter per market and type, with trailing-four-quarter sums and year-over-year changes</p>
+            <pre class="code"><code>CREATE VIEW cre.v_market_kpis AS
+WITH q AS (
+  SELECT *,
+    SUM(net_absorption_sf) OVER w4            AS net_absorption_t4q_sf,
+    SUM(deliveries_sf)     OVER w4            AS deliveries_t4q_sf,
+    SUM(sales_volume_usd)  OVER w4            AS sales_volume_t4q_usd,
+    vacancy_pct - LAG(vacancy_pct, 4) OVER w  AS vacancy_yoy_pp,
+    SAFE_DIVIDE(asking_rent_psf,
+      LAG(asking_rent_psf, 4) OVER w) * 100 - 100
+                                              AS rent_yoy_pct,
+    ROW_NUMBER() OVER (PARTITION BY market, property_type
+                       ORDER BY quarter DESC) AS rn
+  FROM cre.market_quarterly
+  WINDOW w  AS (PARTITION BY market, property_type
+                ORDER BY quarter),
+         w4 AS (PARTITION BY market, property_type
+                ORDER BY quarter
+                ROWS BETWEEN 3 PRECEDING AND CURRENT ROW)
+)
+SELECT q.quarter, q.market, m.name AS market_name,
+  q.property_type, q.vacancy_pct, q.vacancy_yoy_pp,
+  q.net_absorption_t4q_sf, q.asking_rent_psf, q.rent_yoy_pct,
+  q.cap_rate_pct,
+  ROUND((q.cap_rate_pct - q.treasury_10y_pct) * 100)
+                                              AS spread_to_10y_bps,
+  SAFE_DIVIDE(q.under_construction_sf, q.inventory_sf) * 100
+                                              AS under_construction_pct_inventory
+FROM q JOIN cre.markets AS m ON m.id = q.market
+WHERE q.rn = 1;</code></pre>
             <h3>How the AI features stay trustworthy</h3>
             <ul class="bullets">
               <li>Every number in a summary is computed first, then put into words. The model never does the arithmetic.</li>
-              <li>The Gemini prompt contains only the current KPI table, and the model is told to say when an answer isn't in it.</li>
+              <li>The Gemini prompt contains only the current KPI table, and the model is told to say when an answer isn't in it. It runs at a low temperature with a capped answer length.</li>
+              <li>If Gemini is unavailable, a rules-based insight engine answers from the same data, so the assistant never goes blank.</li>
               <li>The forecast is a damped Holt trend model with an error band. It is a transparent baseline, not a black box.</li>
               <li>Anomalies are flagged when a quarter's vacancy change is more than 2.5 standard deviations from that market's own history.</li>
             </ul>

@@ -15,7 +15,7 @@ All data is **synthetic sample data** from `scripts/generate_sample_data.py`. No
 | Demand vs. supply | Net absorption against deliveries |
 | Market scorecard | Sortable table of 10 markets with signals: Unusual move (z-score), Oversupply risk, Softening or Tightening |
 | Portfolio | WALT, share of space expiring within 24 months, mark-to-market renewal cost, and priority actions |
-| Methodology | KPI definitions, a reference Google Cloud pipeline, and an example BigQuery SQL view |
+| Methodology | KPI definitions, how the demo runs on Google Cloud (with a live status line on the hosted site), the path to production, and the live BigQuery KPI view |
 
 ## Project layout
 
