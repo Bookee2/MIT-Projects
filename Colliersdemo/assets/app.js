@@ -546,7 +546,10 @@
       return;
     }
     CRE.load(json);
-    await Assistant.detectServer();
+    const server = await Assistant.detectServer();
+    if (server) {
+      $("arch-status").textContent = `Live now: data from ${server.data_source === "bigquery" ? "BigQuery" : "the bundled file (BigQuery unavailable)"}, answers from ${server.model} on Vertex AI, served by Cloud Run.`;
+    }
     initTheme();
     initFilters();
     renderDefs();
